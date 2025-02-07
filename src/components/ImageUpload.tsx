@@ -1,0 +1,49 @@
+"use client";
+
+import { toast } from "@/hooks/use-toast";
+import { UploadDropzone } from "@/lib/uploadthing";
+import { XIcon } from "lucide-react";
+
+interface ImageUploadProps {
+    onChange: (url: string) => void;
+    value: string;
+    endpoint: "imageUploader";
+}
+
+function ImageUpload({ endpoint, value, onChange }: ImageUploadProps) {
+    if (value) {
+        return (
+            <div className="relative size-40">
+                <img src={value} alt="Upload" className="rounded-md size-40 object-cover" />
+                <button
+                    onClick={() => onChange("")}
+                    className="absolute top-0 right-0 p-1 bg-red-500 rounded-full shadow-sm"
+                    type="button"
+                >
+                    <XIcon className="h-4 w-4 text-white" />
+                </button>
+            </div>
+        );
+    }
+
+    return (
+        <UploadDropzone
+            endpoint={endpoint}
+            onClientUploadComplete={(res) => {
+                onChange(res?.[0].url);
+                toast({
+                    description: "Image uploaded successfully",
+                })
+            }}
+            onUploadError={(error) => {
+                console.error("Error in uploading image", error);
+                toast({
+                    description: "Failed to upload image",
+                    variant: "destructive"
+                });
+            }}
+        />
+    )
+}
+
+export default ImageUpload
