@@ -140,7 +140,16 @@ function ProfilePageClient({ isFollowing: initialIsFollowing, likedPosts, posts,
                                     {user.location && (
                                         <div className="flex items-center text-muted-foreground">
                                             <MapPinIcon className="size-4 mr-2" />
-                                            {user.location}
+                                            <a
+                                                href={
+                                                    `https://www.google.com/maps/place/${user.location}`
+                                                }
+                                                className="hover:underline"
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                            >
+                                                {user.location}
+                                            </a>
                                         </div>
                                     )}
                                     {user.website && (
