@@ -1,6 +1,5 @@
 import { getProfileByUsername, getUserLikedPosts, getUserPosts, isFollowing } from "@/actions/profile.action"
 import { notFound } from "next/navigation";
-import { title } from "process";
 import ProfilePageClient from "./ProfilePageClient";
 
 export async function generateMetadata({ params }: { params: { username: string } }) {

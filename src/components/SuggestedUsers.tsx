@@ -1,13 +1,13 @@
-import { getRandomUsers } from "@/actions/user.action";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import Link from "next/link";
 import FollowButton from "./FollowButton";
+import { getRandomUsers } from "@/actions/user.action";
 
-async function SuggestedUsers() {
-  const users = await getRandomUsers();
-  if (users?.length === 0) return null;
+type Users = Awaited<ReturnType<typeof getRandomUsers>>;
+type User = Users[number];
 
+async function SuggestedUsers({ users }: { users: User[] }) {
   return (
     <Card>
       <CardHeader>
