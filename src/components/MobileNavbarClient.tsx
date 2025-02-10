@@ -39,8 +39,7 @@ function MobileNavbarClient() {
                                 </Link>
                             </Button>
                             <Button variant="ghost" className="flex items-center gap-3 justify-start" asChild>
-                                <Link href={`/profile/${currentUser.username ?? currentUser.emailAddresses[0].emailAddress.split("@")[0]
-                                    }`}>
+                                <Link href={`/profile/${currentUser.username ?? currentUser.emailAddresses[0].emailAddress.split("@")[0]}`}>
                                     <UserIcon className="w-4 h-4" />
                                     Profile
                                 </Link>
@@ -54,7 +53,7 @@ function MobileNavbarClient() {
                         </>
                     ) : (
                         <SignInButton mode="modal">
-                            <Button variant="default" className="w-full">
+                            <Button variant="default" className="w-full" onClick={() => setShowMobileMenu(!showMobileMenu)}>
                                 Sign In
                             </Button>
                         </SignInButton>
@@ -62,7 +61,7 @@ function MobileNavbarClient() {
                 </nav>
             </SheetContent>
         </Sheet>
-    )
+    );
 }
 
-export default MobileNavbarClient
+export default MobileNavbarClient;
