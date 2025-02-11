@@ -16,7 +16,6 @@ function CreatePost() {
     const { toast } = useToast();
     const [content, setContent] = useState("");
     const [imageUrl, setImageUrl] = useState("");
-    const [loading, setLoading] = useState(false);
     const [isPosting, setIsPosting] = useState(false);
     const [showImageUpload, setShowImageUpload] = useState(false);
 

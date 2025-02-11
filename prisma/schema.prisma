@@ -7,6 +7,22 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum NotificationType {
+  LIKE
+  COMMENT
+  FOLLOW
+}
+
+enum NotificationScope {
+  GLOBAL
+  ROOM
+}
+
+enum PostScope {
+  GLOBAL
+  ROOM
+}
+
 model User {
   id          String   @id @default(cuid())
   email       String   @unique
@@ -22,29 +38,40 @@ model User {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  posts    Post[]
-  comments Comment[]
-  likes    Like[]
+  posts        Post[]
+  comments     Comment[]
+  likes        Like[]
+  createdRooms Room[]
+  roomsJoined  RoomMember[]
 
   followers Follows[] @relation("following") // People who follow this user
   following Follows[] @relation("followers") // People this user follows
 
   notifications        Notification[] @relation("userNotifications") // Notifications for this user
   notificationsCreated Notification[] @relation("notificationCreator") // Notifications created by this user
+
+  @@index([userName])
+  @@index([name])
+  @@index([email])
 }
 
 model Post {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   authorId  String
   content   String?
   image     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  roomId    String?
+  scope     PostScope @default(ROOM)
 
   author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
   comments      Comment[]
   likes         Like[]
   notifications Notification[] // Notifications for this post
+  room          Room?          @relation(fields: [roomId], references: [id])
+
+  @@index([roomId, createdAt])
 }
 
 model Comment {
@@ -87,25 +114,48 @@ model Follows {
 }
 
 model Notification {
-  id        String           @id @default(cuid())
+  id        String            @id @default(cuid())
   userId    String
   creatorId String
   type      NotificationType
+  scope     NotificationScope @default(ROOM)
   postId    String?
   commentId String?
-  read      Boolean          @default(false)
-  createdAt DateTime         @default(now())
+  roomId    String?
+  read      Boolean           @default(false)
+  createdAt DateTime          @default(now())
 
   user    User     @relation("userNotifications", fields: [userId], references: [id], onDelete: Cascade)
   creator User     @relation("notificationCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   post    Post?    @relation(fields: [postId], references: [id], onDelete: Cascade)
   comment Comment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  room    Room?    @relation("roomNotifications", fields: [roomId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([roomId, createdAt])
 }
 
-enum NotificationType {
-  LIKE
-  COMMENT
-  FOLLOW
+model Room {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  adminId     String
+
+  admin         User           @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  members       RoomMember[]
+  posts         Post[]
+  notifications Notification[] @relation("roomNotifications")
+}
+
+model RoomMember {
+  userId   String
+  roomId   String
+  joinedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  room Room @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roomId])
 }
