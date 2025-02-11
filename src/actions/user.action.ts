@@ -158,3 +158,31 @@ export async function toggleFollow(targetUserId: string) {
         return { success: false, error: "Error toggling follow" };
     }
 }
+
+export async function combinedSearch(searchTerm: string) {
+    try {
+        return prisma.user.findMany({
+            where: {
+                OR: [
+                    { userName: { contains: searchTerm, mode: 'insensitive' } },
+                    { name: { contains: searchTerm, mode: 'insensitive' } },
+                    { email: { contains: searchTerm, mode: 'insensitive' } },
+                ]
+            },
+            orderBy: [
+                { name: 'asc' },
+                { userName: 'asc' },
+            ],
+            take: 5,
+            select: {
+                id: true,
+                userName: true,
+                name: true,
+                image: true,
+            }
+        });
+    } catch (error) {
+        console.error("Error in combined search", error);
+        return [];
+    }
+}
