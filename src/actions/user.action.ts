@@ -161,9 +161,6 @@ export async function toggleFollow(targetUserId: string) {
 
 export async function combinedSearch(searchTerm: string) {
     try {
-        const userId = await getDbUserId();
-        if (!userId) return [];
-
         return prisma.user.findMany({
             where: {
                 OR: [
