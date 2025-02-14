@@ -1,34 +1,18 @@
 import React, { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { User } from "@prisma/client";
+import { combinedSearch } from "@/actions/user.action";
+
+type Users = Awaited<ReturnType<typeof combinedSearch>>;
+type User = Users[number];
 
 interface AddUserProps {
     Child: React.ComponentType;
     users: User[];
-    setUsers: React.Dispatch<React.SetStateAction<string[]>>;
+    setUsers: React.Dispatch<React.SetStateAction<{ name: string | null; id: string; userName: string; image: string | null }[]>>;
 }
 
 export default function AddUser({ Child, users, setUsers }: AddUserProps) {
     const [inputValue, setInputValue] = useState("");
-
-    // Handle input change
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setInputValue(e.target.value);
-    };
-
-    // Handle input submission (split by commas)
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === "Enter" || e.key === ",") {
-            e.preventDefault();
-            const newUsers = inputValue
-                .split(",")
-                .map((user) => user.trim())
-                .filter((user) => user !== "");
-
-            setUsers((prev) => [...prev, ...newUsers]);
-            setInputValue("");
-        }
-    };
 
     return (
         <div className="w-full">

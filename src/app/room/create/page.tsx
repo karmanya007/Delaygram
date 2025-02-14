@@ -12,8 +12,10 @@ import { createRoom } from "@/actions/room.action";
 import AddUser from "@/components/AddUser";
 import { UserSearch } from "@/components/UserSearch";
 import { useState } from "react";
-import { User } from "@prisma/client";
+import { combinedSearch } from "@/actions/user.action";
 
+type Users = Awaited<ReturnType<typeof combinedSearch>>;
+type User = Users[number];
 const formSchema = z.object({
     topic: z.string().min(5, {
         message: "Topic must be at least 5 characters.",
