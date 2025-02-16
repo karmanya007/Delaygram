@@ -160,3 +160,12 @@ model RoomMember {
 
   @@id([userId, roomId])
 }
+
+model RoomInviteDetails {
+  id         String  @id @default(uuid())
+  roomId     String
+  userId     String
+  userEmail  String
+  inviteLink String 
+  createdAt  DateTime @default(now())
+}

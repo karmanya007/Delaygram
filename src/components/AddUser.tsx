@@ -8,7 +8,7 @@ type User = Users[number];
 interface AddUserProps {
     Child: React.ComponentType;
     users: User[];
-    setUsers: React.Dispatch<React.SetStateAction<{ name: string | null; id: string; userName: string; image: string | null }[]>>;
+    setUsers: React.Dispatch<React.SetStateAction<{ name: string | null; id: string; userName: string; image: string | null; email: string; }[]>>;
 }
 
 export default function AddUser({ Child, users, setUsers }: AddUserProps) {
