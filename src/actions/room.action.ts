@@ -12,7 +12,7 @@ export async function createRoom(rName:string,rDesc:string) {
         data: {
             name:rName,
             description:rDesc,
-            roomSlug:`${rName}-${nanoid(8)}`,
+            roomSlug:`${nanoid(8)}`,
             adminId:uid
         }
     })

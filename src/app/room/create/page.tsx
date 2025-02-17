@@ -17,9 +17,12 @@ import { combinedSearch } from "@/actions/user.action";
 type Users = Awaited<ReturnType<typeof combinedSearch>>;
 type User = Users[number];
 const formSchema = z.object({
-    topic: z.string().min(5, {
-        message: "Topic must be at least 5 characters.",
-    }),
+    topic: z
+        .string()
+        .min(5, {
+            message: "Topic must be at least 5 characters.",
+        })
+        .max(20, { message: "Max Character Limit is 20 ccharacters." }),
     desription: z.string().max(150, {
         message: "Description should be less than 150 characters",
     }),
@@ -66,7 +69,7 @@ export default function Room() {
                                     name="topic"
                                     render={({ field }) => (
                                         <FormItem>
-                                            <FormLabel>Room Topic</FormLabel>
+                                            <FormLabel>Room Name</FormLabel>
                                             <FormControl>
                                                 <Input placeholder="Cool Stuff" {...field} />
                                             </FormControl>
