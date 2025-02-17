@@ -28,6 +28,7 @@ const formSchema = z.object({
 
 export default function Room() {
     const [users, setUsers] = useState<User[]>([]);
+    const [open, setOpen] = useState(false);
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -46,6 +47,7 @@ export default function Room() {
         if (users.length > 0) {
             form.setValue("users", [users[0], ...users.slice(1)]);
         }
+        setOpen(false);
     }
     const WrappedUserSearch: React.FC = () => <UserSearch onSelectUser={onSelectUser} />;
     return (
@@ -94,7 +96,7 @@ export default function Room() {
                                         <FormItem>
                                             <FormLabel>Add Users</FormLabel>
                                             <FormControl>
-                                                <AddUser Child={WrappedUserSearch} users={users} setUsers={setUsers} />
+                                                <AddUser ContentChild={WrappedUserSearch} users={users} setUsers={setUsers} open={open} setOpen={setOpen} />
                                             </FormControl>
                                             <FormDescription>Add some users to your room</FormDescription>
                                             <FormMessage />
