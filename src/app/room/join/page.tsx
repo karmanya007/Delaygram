@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,19 +13,14 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Link, Copy, CheckCircle, XCircle } from "lucide-react";
 import AddUser from "@/components/AddUser";
 import { UserSearch } from "@/components/UserSearch";
-import { createRoomInvite } from '@/actions/room.action';
+import { createRoomInvite } from "@/actions/room.action";
+import { combinedSearch } from "@/actions/user.action";
 
 const formSchema = z.object({
     users: z.array(z.string()).min(1, "Please add at least one user."),
 });
 
-type Users = {
-    name: string | null;
-    id: string;
-    userName: string;
-    image: string | null;
-    email: string;
-}[];
+type Users = Awaited<ReturnType<typeof combinedSearch>>;
 type User = Users[number];
 
 const JoinRoom = () => {
@@ -38,6 +33,7 @@ const JoinRoom = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [currentUserSet, setCurrentUserSet] = useState<Set<string>>(new Set());
     const [canGenerateNewLink, setCanGenerateNewLink] = useState(true);
+    const [open, setOpen] = useState(false);
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
@@ -46,21 +42,24 @@ const JoinRoom = () => {
 
     // Track user list changes
     useEffect(() => {
-        const newUserSet = new Set(users.map(user => user.id));
-        const hasUserListChanged = users.length !== currentUserSet.size || 
-            ![...newUserSet].every(id => currentUserSet.has(id));
-        
+        const newUserSet = new Set(users.map((user) => user.id));
+        const hasUserListChanged = users.length !== currentUserSet.size || ![...newUserSet].every((id) => currentUserSet.has(id));
+
         setCanGenerateNewLink(hasUserListChanged || !inviteLink);
     }, [users, currentUserSet, inviteLink]);
 
     function onSelectUser(user: User) {
         setUsers((prev) => [...prev, user]);
         if (users.length > 0) {
-            form.setValue("users", users.map(user => user.id));
+            form.setValue(
+                "users",
+                users.map((user) => user.id)
+            );
         }
+        setOpen(false);
     }
 
-    const WrappedUserSearch: React.FC = () => <UserSearch onSelectUser={onSelectUser} allowMultiple={true} />;
+    const WrappedUserSearch: React.FC = () => <UserSearch onSelectUser={onSelectUser} />;
 
     async function onInvite() {
         if (!roomId) return;
@@ -70,7 +69,7 @@ const JoinRoom = () => {
             await createRoomInvite(users, roomId, inviteId);
             setInviteLink(`${window.location.origin}/room/${inviteId}`);
             // Update current user set after successful invite generation
-            setCurrentUserSet(new Set(users.map(user => user.id)));
+            setCurrentUserSet(new Set(users.map((user) => user.id)));
         } catch (error) {
             console.error(error);
         } finally {
@@ -87,11 +86,11 @@ const JoinRoom = () => {
     };
 
     const handleRemoveUser = (userId: string) => {
-        setUsers(users.filter(u => u.id !== userId));
+        setUsers(users.filter((u) => u.id !== userId));
     };
 
     return (
-        <div className="min-h-screen p-4">
+        <div className="p-4">
             <div className="max-w-3xl mx-auto">
                 <Card className="shadow-lg">
                     <CardHeader className="space-y-1">
@@ -99,9 +98,7 @@ const JoinRoom = () => {
                             <Users className="w-5 h-5 text-primary" />
                             <CardTitle>Invite Users to Room</CardTitle>
                         </div>
-                        <CardDescription>
-                            Add team members to collaborate in this room
-                        </CardDescription>
+                        <CardDescription>Add team members to collaborate in this room</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <Form {...form}>
@@ -113,45 +110,18 @@ const JoinRoom = () => {
                                         <FormItem>
                                             <FormLabel className="text-base">Select Users</FormLabel>
                                             <FormControl>
-                                                <AddUser Child={WrappedUserSearch} users={users} setUsers={setUsers} />
+                                                <AddUser ContentChild={WrappedUserSearch} users={users} setUsers={setUsers} open={open} setOpen={setOpen} />
                                             </FormControl>
-                                            <FormDescription>
-                                                Search and select users to invite to this room
-                                            </FormDescription>
+                                            <FormDescription>Search and select users to invite to this room</FormDescription>
                                             <FormMessage />
                                         </FormItem>
                                     )}
                                 />
                             </form>
                         </Form>
-
-                        {users.length > 0 && (
-                            <div className="mt-4">
-                                <h3 className="text-sm font-medium mb-2">Selected Users:</h3>
-                                <div className="flex flex-wrap gap-2">
-                                    {users.map((user) => (
-                                        <Badge 
-                                            key={user.id}
-                                            variant="secondary"
-                                            className="flex items-center gap-1 px-3 py-1"
-                                        >
-                                            {user.name || user.userName}
-                                            <XCircle
-                                                className="w-4 h-4 ml-1 cursor-pointer hover:text-red-500"
-                                                onClick={() => handleRemoveUser(user.id)}
-                                            />
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </CardContent>
                     <CardFooter className="flex flex-col space-y-4">
-                        <Button 
-                            className="w-full"
-                            onClick={onInvite}
-                            disabled={users.length === 0 || isLoading || !canGenerateNewLink}
-                        >
+                        <Button className="w-full" onClick={onInvite} disabled={users.length === 0 || isLoading || !canGenerateNewLink}>
                             {isLoading ? (
                                 <div className="flex items-center space-x-2">
                                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -168,20 +138,9 @@ const JoinRoom = () => {
                         {inviteLink && (
                             <div className="w-full p-4 border rounded-lg bg-muted">
                                 <div className="flex items-center justify-between">
-                                    <code className="relative rounded bg-background px-[0.3rem] py-[0.2rem] font-mono text-sm">
-                                        {inviteLink}
-                                    </code>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={copyToClipboard}
-                                        className="ml-2"
-                                    >
-                                        {isCopied ? (
-                                            <CheckCircle className="w-4 h-4 text-green-500" />
-                                        ) : (
-                                            <Copy className="w-4 h-4" />
-                                        )}
+                                    <code className="relative rounded bg-background px-[0.3rem] py-[0.2rem] font-mono text-sm">{inviteLink}</code>
+                                    <Button variant="outline" size="sm" onClick={copyToClipboard} className="ml-2">
+                                        {isCopied ? <CheckCircle className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
                                     </Button>
                                 </div>
                             </div>
