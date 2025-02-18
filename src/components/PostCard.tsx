@@ -33,7 +33,7 @@ function PostCard({ post, dbUserId }: { post: Post, dbUserId: string | null }) {
             setIsLiking(true);
             setHasLiked(!hasLiked);
             setLikes(hasLiked ? likes - 1 : likes + 1);
-            await toggleLike(post.id);
+            await toggleLike(post.id, post.roomId);
         } catch (error) {
             setLikes(post._count.likes);
             setHasLiked(post.likes.some((like) => like.userId === dbUserId));
@@ -48,7 +48,7 @@ function PostCard({ post, dbUserId }: { post: Post, dbUserId: string | null }) {
 
         try {
             setIsCommenting(true);
-            const res = await createComment(post.id, newComment);
+            const res = await createComment(post.id, newComment, post.roomId);
             if (res?.success) {
                 toast({
                     description: "Comment added successfully"

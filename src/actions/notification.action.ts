@@ -35,6 +35,12 @@ export async function getNotifications() {
                         createdAt: true,
                     },
                 },
+                room: {
+                    select: {
+                        roomSlug: true,
+                        name: true
+                    }
+                }
             },
             orderBy: {
                 createdAt: "desc"

@@ -116,9 +116,22 @@ function NotificationsPage() {
                                                 </div>
                                             )}
 
-                                        <p className="text-sm text-muted-foreground pl-6">
-                                            {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
-                                        </p>
+                                        <div className="flex items-center justify-between pl-6">
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDistanceToNow(new Date(notification.createdAt), { addSuffix: true })}
+                                            </p>
+                                            {notification.room && (
+                                                <span
+                                                    className="inline-block px-2 py-1 text-[10px] rounded-sm font-bold max-w-xs overflow-hidden center"
+                                                    style={{
+                                                        backgroundColor: '#EEEEEE',
+                                                        color: 'hsl(0, 0%, 20%)'
+                                                    }}
+                                                >
+                                                    {notification.room.name}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))

@@ -186,3 +186,30 @@ export async function combinedSearch(searchTerm: string) {
         return [];
     }
 }
+
+export async function getJoinedRooms(id: string | null) {
+    if (!id) return [];
+    try {
+        return prisma.user.findUnique({
+            where: {
+                id
+            },
+            select: {
+                roomsJoined: {
+                    include: {
+                        room: {
+                            select: {
+                                id: true,
+                                name: true,
+                                roomSlug: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error("Error in getting joined room", error);
+        return [];
+    }
+}
