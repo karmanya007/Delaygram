@@ -3,8 +3,9 @@
 import { prisma } from "@/lib/prisma";
 import { getDbUserId } from "./user.action";
 import { revalidatePath } from "next/cache";
+import { NotificationScope, PostScope } from "@prisma/client";
 
-export async function createPost(content: string, image: string) {
+export async function createPost(content: string, image: string, roomId?: string) {
     try {
         const userId = await getDbUserId();
         if (!userId) return;
@@ -13,7 +14,9 @@ export async function createPost(content: string, image: string) {
             data: {
                 content,
                 image,
-                authorId: userId
+                authorId: userId,
+                roomId: roomId,
+                scope: roomId ? PostScope.ROOM : PostScope.GLOBAL
             }
         });
 
@@ -25,9 +28,10 @@ export async function createPost(content: string, image: string) {
     }
 }
 
-export async function getPosts() {
+export async function getPosts(roomId?: string) {
     try {
-        const posts = await prisma.post.findMany({
+        return await prisma.post.findMany({
+            where: roomId ? { roomId } : { scope: PostScope.GLOBAL },
             orderBy: {
                 createdAt: "desc"
             },
@@ -68,21 +72,19 @@ export async function getPosts() {
                 }
             }
         });
-
-        return posts;
     } catch (error) {
         console.error("Error in getting posts", error);
         return [];
     }
 }
 
-export async function toggleLike(postId: string) {
+export async function toggleLike(postId: string, roomId: string | null) {
     try {
         const userId = await getDbUserId();
         if (!userId) return;
 
         const post = await prisma.post.findUnique({
-            where: { id: postId },
+            where: { id: postId, roomId },
             select: { authorId: true },
         });
 
@@ -125,6 +127,8 @@ export async function toggleLike(postId: string) {
                                 userId: post.authorId, // recipient (post author)
                                 creatorId: userId, // person who liked
                                 postId,
+                                roomId,
+                                scope: roomId ? NotificationScope.ROOM : NotificationScope.GLOBAL
                             },
                         }),
                     ]
@@ -140,7 +144,7 @@ export async function toggleLike(postId: string) {
     }
 }
 
-export async function createComment(postId: string, content: string) {
+export async function createComment(postId: string, content: string, roomId: string | null) {
     try {
         const userId = await getDbUserId();
 
@@ -148,7 +152,7 @@ export async function createComment(postId: string, content: string) {
         if (!content) throw new Error("Content is required");
 
         const post = await prisma.post.findUnique({
-            where: { id: postId },
+            where: { id: postId, roomId },
             select: { authorId: true },
         });
 
@@ -174,6 +178,8 @@ export async function createComment(postId: string, content: string) {
                         creatorId: userId,
                         postId,
                         commentId: newComment.id,
+                        roomId,
+                        scope: roomId ? NotificationScope.ROOM : NotificationScope.GLOBAL
                     },
                 });
             }

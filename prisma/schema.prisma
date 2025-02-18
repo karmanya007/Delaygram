@@ -63,7 +63,7 @@ model Post {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   roomId    String?
-  scope     PostScope @default(ROOM)
+  scope     PostScope @default(GLOBAL)
 
   author        User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
   comments      Comment[]
@@ -118,7 +118,7 @@ model Notification {
   userId    String
   creatorId String
   type      NotificationType
-  scope     NotificationScope @default(ROOM)
+  scope     NotificationScope @default(GLOBAL)
   postId    String?
   commentId String?
   roomId    String?
@@ -148,6 +148,8 @@ model Room {
   members       RoomMember[]
   posts         Post[]
   notifications Notification[] @relation("roomNotifications")
+
+  @@index([roomSlug])
 }
 
 model RoomMember {

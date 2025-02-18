@@ -11,7 +11,11 @@ import { createPost } from "@/actions/post.action";
 import { useToast } from "@/hooks/use-toast";
 import ImageUpload from "./ImageUpload";
 
-function CreatePost() {
+type CreatePostProps = {
+    roomId?: string;
+}
+
+function CreatePost({ roomId }: CreatePostProps) {
     const { user } = useUser();
     const { toast } = useToast();
     const [content, setContent] = useState("");
@@ -22,7 +26,7 @@ function CreatePost() {
     const handleSubmit = async () => {
         setIsPosting(true);
         try {
-            const post = await createPost(content.trim(), imageUrl);
+            const post = await createPost(content.trim(), imageUrl, roomId);
             if (post) {
                 setContent("");
                 setImageUrl("");
