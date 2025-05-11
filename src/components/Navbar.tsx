@@ -4,10 +4,13 @@ import DesktopNavbar from './DesktopNavbar'
 import MobileNavbar from './MobileNavbar'
 import { currentUser } from '@clerk/nextjs/server';
 import { syncUser } from '@/actions/user.action';
+import { getUserRooms } from '@/actions/room.action';
+import { RoomSwitcher } from './RoomSwitcher';
 
 async function Navbar() {
     const user = await currentUser();
     if (user) await syncUser(user);
+    const rooms = await getUserRooms();
 
     return (
         <nav className="sticky top-0 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
@@ -18,9 +21,11 @@ async function Navbar() {
                             Delaygram
                         </Link>
                     </div>
-
-                    <DesktopNavbar user={user} />
-                    <MobileNavbar />
+                    <div className="flex space-x-4">
+                        {user && <RoomSwitcher rooms={rooms} className=" md:flex" />}
+                        <DesktopNavbar user={user} />
+                        <MobileNavbar /> 
+                    </div>
                 </div>
             </div>
         </nav>

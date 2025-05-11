@@ -12,6 +12,10 @@ import { createRoom } from "@/actions/room.action";
 import AddUser from "@/components/AddUser";
 import { UserSearch } from "@/components/UserSearch";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast"; // Added for toast action
+import { Loader2 } from "lucide-react";
 import { combinedSearch } from "@/actions/user.action";
 
 type Users = Awaited<ReturnType<typeof combinedSearch>>;
@@ -27,8 +31,12 @@ const formSchema = z.object({
 });
 
 export default function Room() {
+    const router = useRouter();
+    const { toast } = useToast(); // Added for toast notifications
     const [users, setUsers] = useState<User[]>([]);
     const [open, setOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false); // Added for loading state
+
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
         defaultValues: {
@@ -38,8 +46,47 @@ export default function Room() {
         },
     });
 
-    function onSubmit(values: z.infer<typeof formSchema>) {
-        createRoom(values.topic, values.desription);
+    async function onSubmit(values: z.infer<typeof formSchema>) {
+        setIsLoading(true);
+        try {
+            const newRoom = await createRoom(values.topic, values.desription);
+            if (newRoom && newRoom.roomSlug) {
+                toast({
+                    title: "Success!",
+                    description: `Room "${newRoom.name}" created successfully. Redirecting...`,
+                    variant: "default",
+                });
+                router.refresh(); // Re-fetch server-side data
+                setTimeout(() => {
+                    router.push(`/room/${newRoom.roomSlug}`);
+                }, 1500); // Delay for toast visibility
+            } else {
+                toast({
+                    title: "Error",
+                    description: "Failed to create room. Please try again.",
+                    variant: "destructive",
+                    action: (
+                        <ToastAction altText="Try again" onClick={() => form.handleSubmit(onSubmit)()}>
+                            Try again
+                        </ToastAction>
+                    ),
+                });
+                setIsLoading(false);
+            }
+        } catch (error) {
+            console.error("Error creating room:", error);
+            toast({
+                title: "Error",
+                description: "An unexpected error occurred. Please try again.",
+                variant: "destructive",
+                action: (
+                    <ToastAction altText="Try again" onClick={() => form.handleSubmit(onSubmit)()}>
+                        Try again
+                    </ToastAction>
+                ),
+            });
+            setIsLoading(false);
+        }
     }
     function onSelectUser(user: User) {
         console.log(user);
@@ -107,9 +154,13 @@ export default function Room() {
                         </Form>
                     </CardContent>
                     <CardFooter>
-                        <Button className="w-full" type="submit" onClick={form.handleSubmit(onSubmit)}>
-                            Create Room
-                            <SquarePlusIcon className="size-4 mr-2" />
+                        <Button className="w-full" type="submit" onClick={form.handleSubmit(onSubmit)} disabled={isLoading}>
+                            {isLoading ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <SquarePlusIcon className="size-4 mr-2" />
+                            )}
+                            {isLoading ? "Creating Room..." : "Create Room"}
                         </Button>
                     </CardFooter>
                 </Card>
