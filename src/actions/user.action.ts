@@ -1,215 +1,119 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { auth } from "@clerk/nextjs/server";
-import type { User } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
+import { revalidateTag } from "next/cache";
+import { z } from "zod";
 
-export async function syncUser(user: User) {
-    try {
-        const { userId } = await auth();
+import { fail, ok, type ActionResult } from "@/lib/action-result";
+import { getAppSession } from "@/lib/auth/session";
+import { cacheTags } from "@/lib/cache-tags";
+import { isAppError } from "@/lib/errors";
+import { logError } from "@/lib/logger";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { runWithTrace } from "@/lib/trace";
+import { roomRepository } from "@/server/repositories/room.repository";
+import { userRepository } from "@/server/repositories/user.repository";
+import { userService } from "@/server/services/user.service";
 
-        if (!userId || !user) return;
+const followSchema = z.object({
+  targetUserId: z.string().min(1),
+});
 
-        const existingUser = await prisma.user.findUnique({
-            where: {
-                clerkId: userId
-            }
-        });
-
-        if (existingUser) {
-            return existingUser;
-        }
-
-        const dbUser = await prisma.user.create({
-            data: {
-                clerkId: userId,
-                name: `${user.firstName || ""} ${user.lastName || ""}`,
-                email: user.emailAddresses[0].emailAddress,
-                userName: user.username ?? user.emailAddresses[0].emailAddress.split("@")[0],
-                image: user.imageUrl,
-                phoneNumber: user.phoneNumbers[0].phoneNumber,
-            }
-        })
-
-        return dbUser;
-    } catch (error) {
-        console.error("Error in syncing user", error);
-        return null;
-    }
+export async function syncUser() {
+  return getAppSession({ provision: true });
 }
 
 export async function getUserByClerkId(clerkId: string) {
-    try {
-        const user = await prisma.user.findUnique({
-            where: {
-                clerkId
-            },
-            include: {
-                _count: {
-                    select: {
-                        posts: true,
-                        followers: true,
-                        following: true
-                    }
-                }
-            }
-        });
-
-        return user;
-    } catch (error) {
-        console.error("Error in getting user by clerk id", error);
-        return null;
-    }
+  return userRepository.findByClerkId(clerkId);
 }
 
 export async function getDbUserId() {
-    const { userId: clerkId } = await auth();
-    if (!clerkId) return null;
-
-    const user = await getUserByClerkId(clerkId);
-
-    if (!user) throw new Error("User not found");
-
-    return user.id;
+  const session = await getAppSession({ provision: true });
+  return session?.userId ?? null;
 }
 
 export async function getRandomUsers() {
-    try {
-        const userId = await getDbUserId();
-        if (!userId) return [];
+  try {
+    const session = await getAppSession({ provision: true });
 
-        const users = await prisma.user.findMany({
-            where: {
-                AND: [
-                    { NOT: { id: userId } },
-                    { NOT: { followers: { some: { followerId: userId } } } }
-                ]
-            },
-            select: {
-                id: true,
-                name: true,
-                userName: true,
-                image: true,
-                _count: {
-                    select: {
-                        followers: true,
-                    }
-                }
-            },
-            take: 5
-        });
-
-        return users;
-    } catch (error) {
-        console.error("Error in getting random users", error);
-        return [];
+    if (!session) {
+      return [];
     }
+
+    return userRepository.findSuggestionsForUser(session.userId);
+  } catch (error) {
+    logError("actions.getRandomUsers", error);
+    return [];
+  }
 }
 
-export async function toggleFollow(targetUserId: string) {
+export async function toggleFollow(
+  input: z.input<typeof followSchema>,
+): Promise<ActionResult<{ following: boolean }>> {
+  return runWithTrace(async () => {
     try {
-        const userId = await getDbUserId();
-        if (!userId) return;
+      const parsed = followSchema.parse(input);
+      const session = await getAppSession({ provision: true });
 
-        if (targetUserId === userId) throw new Error("Cannot follow self");
+      if (session) {
+        const { allowed } = checkRateLimit(`toggleFollow:${session.userId}`, 30, 60);
+        if (!allowed) return fail("conflict", "Too many follow actions. Please wait a minute.");
+      }
 
-        const isFollowing = await prisma.follows.findUnique({
-            where: {
-                followerId_followingId: {
-                    followerId: userId,
-                    followingId: targetUserId
-                }
-            }
-        });
+      const result = await userService.toggleFollow(parsed);
 
-        if (isFollowing) { // Unfollow
-            await prisma.follows.delete({
-                where: {
-                    followerId_followingId: {
-                        followerId: userId,
-                        followingId: targetUserId
-                    }
-                }
-            });
-        }
-        else { // Follow
-            await prisma.$transaction([
-                prisma.follows.create({
-                    data: {
-                        followerId: userId,
-                        followingId: targetUserId
-                    }
-                }),
-                prisma.notification.create({
-                    data: {
-                        type: "FOLLOW",
-                        userId: targetUserId,
-                        creatorId: userId
-                    }
-                })
-            ])
-        }
+      revalidateTag(cacheTags.profile(parsed.targetUserId));
+      revalidateTag(cacheTags.notifications(parsed.targetUserId));
 
-        revalidatePath("/");
-        return { success: true };
+      if (session) {
+        revalidateTag(cacheTags.profile(session.userId));
+        revalidateTag(cacheTags.roomsForUser(session.userId));
+      }
+
+      return ok(result);
     } catch (error) {
-        console.error("Error in toggling follow", error);
-        return { success: false, error: "Error toggling follow" };
+      if (error instanceof z.ZodError) {
+        return fail("validation", error.errors[0]?.message ?? "Invalid follow payload");
+      }
+
+      if (isAppError(error)) {
+        return fail(error.code, error.message);
+      }
+
+      logError("actions.toggleFollow", error);
+      return fail("infrastructure", "Error toggling follow");
     }
+  });
 }
 
 export async function combinedSearch(searchTerm: string) {
-    try {
-        return prisma.user.findMany({
-            where: {
-                OR: [
-                    { userName: { contains: searchTerm, mode: 'insensitive' } },
-                    { name: { contains: searchTerm, mode: 'insensitive' } },
-                    { email: { contains: searchTerm, mode: 'insensitive' } },
-                ]
-            },
-            orderBy: [
-                { name: 'asc' },
-                { userName: 'asc' },
-            ],
-            take: 5,
-            select: {
-                id: true,
-                userName: true,
-                name: true,
-                image: true,
-            }
-        });
-    } catch (error) {
-        console.error("Error in combined search", error);
-        return [];
+  try {
+    const normalized = searchTerm.trim().slice(0, 100);
+
+    if (!normalized) {
+      return [];
     }
+
+    return userRepository.searchUsers(normalized);
+  } catch (error) {
+    logError("actions.combinedSearch", error, { searchTerm });
+    return [];
+  }
 }
 
 export async function getJoinedRooms(id: string | null) {
-    if (!id) return [];
-    try {
-        return prisma.user.findUnique({
-            where: {
-                id
-            },
-            select: {
-                roomsJoined: {
-                    include: {
-                        room: {
-                            select: {
-                                id: true,
-                                name: true,
-                                roomSlug: true
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    } catch (error) {
-        console.error("Error in getting joined room", error);
-        return [];
-    }
+  if (!id) {
+    return { roomsJoined: [] };
+  }
+
+  try {
+    const rooms = await roomRepository.listRoomsForUser(id);
+    return {
+      roomsJoined: rooms.map((room) => ({
+        room,
+      })),
+    };
+  } catch (error) {
+    logError("actions.getJoinedRooms", error, { userId: id });
+    return { roomsJoined: [] };
+  }
 }

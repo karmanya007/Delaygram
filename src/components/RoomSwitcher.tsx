@@ -9,7 +9,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { ChevronsUpDown } from "lucide-react";
+import { useRoom } from "./RoomContext";
 
 interface Room {
     id: string;
@@ -25,26 +25,29 @@ interface RoomSwitcherProps {
 export function RoomSwitcher({ rooms, className }: RoomSwitcherProps) {
     const router = useRouter();
     const pathname = usePathname();
+    const { selectedRoomSlug, setSelectedRoomSlug } = useRoom();
 
-    const currentRoomSlug = React.useMemo(() => {
+    // When URL is a room page, sync the context (e.g. direct link, browser back/forward)
+    React.useEffect(() => {
         if (pathname.startsWith("/room/")) {
-            return pathname.split("/")[2];
+            const slug = pathname.split("/")[2];
+            if (slug && slug !== "create" && slug !== "join") {
+                setSelectedRoomSlug(slug);
+            }
         }
-        return "global"; // Default to global
     }, [pathname]);
 
     const handleValueChange = (value: string) => {
-        if (value === "global") {
-            router.push("/");
-        } else if (value === "create-new-room") {
+        if (value === "create-new-room") {
             router.push("/room/create");
-        } else {
-            router.push(`/room/${value}`);
+            return;
         }
+        setSelectedRoomSlug(value);
+        router.push(value === "global" ? "/" : `/room/${value}`);
     };
 
     return (
-        <Select onValueChange={handleValueChange} defaultValue={currentRoomSlug}>
+        <Select onValueChange={handleValueChange} value={selectedRoomSlug}>
             <SelectTrigger className="ext-xl font-bold text-primary font-mono tracking-wider">
                 <SelectValue placeholder="Select a room" />
             </SelectTrigger>

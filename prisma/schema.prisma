@@ -11,6 +11,9 @@ enum NotificationType {
   LIKE
   COMMENT
   FOLLOW
+  NEW_POST
+  MENTION
+  ROOM_INVITE
 }
 
 enum NotificationScope {
@@ -23,26 +26,34 @@ enum PostScope {
   ROOM
 }
 
+enum MediaType {
+  IMAGE
+  VIDEO
+}
+
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  userName    String   @unique
-  clerkId     String   @unique
-  name        String?
-  bio         String?
-  password    String?
-  image       String?
-  location    String?
-  website     String?
-  phoneNumber String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  email           String   @unique
+  userName        String   @unique
+  clerkId         String   @unique
+  name            String?
+  bio             String?
+  password        String?
+  image           String?
+  backgroundImage String?
+  location        String?
+  website         String?
+  phoneNumber     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   posts        Post[]
   comments     Comment[]
   likes        Like[]
   createdRooms Room[]
   roomsJoined  RoomMember[]
+  savedPosts   SavedPost[]
+  mentions     PostMention[]
 
   followers Follows[] @relation("following") // People who follow this user
   following Follows[] @relation("followers") // People this user follows
@@ -60,6 +71,8 @@ model Post {
   authorId  String
   content   String?
   image     String?
+  isPinned  Boolean   @default(false)
+  pinnedAt  DateTime?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   roomId    String?
@@ -70,8 +83,51 @@ model Post {
   likes         Like[]
   notifications Notification[] // Notifications for this post
   room          Room?          @relation(fields: [roomId], references: [id])
+  media         PostMedia[]
+  savedBy       SavedPost[]
+  mentions      PostMention[]
 
   @@index([roomId, createdAt])
+  @@index([scope, createdAt])
+  @@index([authorId, isPinned])
+}
+
+model PostMedia {
+  id        String    @id @default(cuid())
+  postId    String
+  url       String
+  type      MediaType
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, order])
+}
+
+model SavedPost {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([userId, createdAt])
+}
+
+model PostMention {
+  id        String   @id @default(cuid())
+  postId    String
+  userId    String
+  createdAt DateTime @default(now())
+
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, userId])
 }
 
 model Comment {
@@ -79,6 +135,7 @@ model Comment {
   authorId  String
   postId    String
   content   String
+  image     String?
   createdAt DateTime @default(now())
 
   author   User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
@@ -164,10 +221,10 @@ model RoomMember {
 }
 
 model RoomInviteDetails {
-  id         String  @id @default(uuid())
-  roomId     String
-  userId     String
-  userEmail  String
-  inviteLink String 
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  roomId    String
+  userId    String
+  userEmail String
+  inviteLink String
+  createdAt DateTime @default(now())
 }

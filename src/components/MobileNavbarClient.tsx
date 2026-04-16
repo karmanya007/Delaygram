@@ -4,11 +4,20 @@ import { BellIcon, HomeIcon, LogOutIcon, MenuIcon, UserIcon } from "lucide-react
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
 import Link from "next/link";
-import { SignInButton, SignOutButton, useUser } from "@clerk/nextjs";
+import { SignInButton, SignOutButton } from "@clerk/nextjs";
 import { useState } from "react";
+import { Badge } from "./ui/badge";
+import { HomeLink } from "./HomeLink";
 
-function MobileNavbarClient() {
-    const { user: currentUser } = useUser();
+function MobileNavbarClient({
+    isSignedIn,
+    profileHref,
+    unreadNotificationCount,
+}: {
+    isSignedIn: boolean;
+    profileHref?: string;
+    unreadNotificationCount: number;
+}) {
     const [showMobileMenu, setShowMobileMenu] = useState(false);
 
     return (
@@ -24,22 +33,30 @@ function MobileNavbarClient() {
                 </SheetHeader>
                 <nav className="flex flex-col space-y-4 mt-6">
                     <Button variant="ghost" className="flex items-center gap-3 justify-start" asChild>
-                        <Link href="/">
+                        <HomeLink>
                             <HomeIcon className="w-4 h-4" />
                             Home
-                        </Link>
+                        </HomeLink>
                     </Button>
 
-                    {currentUser ? (
+                    {isSignedIn ? (
                         <>
                             <Button variant="ghost" className="flex items-center gap-3 justify-start" asChild>
-                                <Link href="/notifications">
+                                <Link href="/notifications" className="relative">
                                     <BellIcon className="w-4 h-4" />
                                     Notifications
+                                    {unreadNotificationCount > 0 ? (
+                                        <Badge
+                                            variant="destructive"
+                                            className="h-5 min-w-5 px-1 text-[10px] absolute left-20 -top-2"
+                                        >
+                                            {unreadNotificationCount > 99 ? "99+" : unreadNotificationCount}
+                                        </Badge>
+                                    ) : null}
                                 </Link>
                             </Button>
                             <Button variant="ghost" className="flex items-center gap-3 justify-start" asChild>
-                                <Link href={`/profile/${currentUser.username ?? currentUser.emailAddresses[0].emailAddress.split("@")[0]}`}>
+                                <Link href={profileHref ?? "/"}>
                                     <UserIcon className="w-4 h-4" />
                                     Profile
                                 </Link>

@@ -1,33 +1,52 @@
-import { getPosts } from "@/actions/post.action";
-import { getDbUserId, getJoinedRooms, getRandomUsers } from "@/actions/user.action";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
 import CreatePost from "@/components/CreatePost";
 import PostCard from "@/components/PostCard";
 import SuggestedUsers from "@/components/SuggestedUsers";
 import { UserSearch } from "@/components/UserSearch";
-import { currentUser } from "@clerk/nextjs/server";
-import { notFound } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { getRoomPageData } from "@/server/queries/feed.query";
 
 export default async function Room({ params }: { params: Promise<{ roomSlug: string }> }) {
   const { roomSlug } = await params;
-  const dbUserId = await getDbUserId();
-  const joinedRooms = await getJoinedRooms(dbUserId);
-  const joinedRoom = (joinedRooms && "roomsJoined" in joinedRooms) ? joinedRooms?.roomsJoined?.find(rooms => rooms.room.roomSlug === roomSlug) : null;
+  const { session, room, posts, suggestedUsers } = await getRoomPageData(roomSlug);
 
-  if (!joinedRoom)
+  if (!room) {
     notFound();
-
-  const user = await currentUser();
-  const posts = await getPosts(joinedRoom.roomId);
-  const users = await getRandomUsers();
+  }
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
       <div className={`lg:col-span-6 lg:col-start-2`}>
-        {user ? <CreatePost roomId={joinedRoom.roomId} /> : null}
+        <div className="mb-6 rounded-xl border bg-card p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-1">
+              <h1 className="text-2xl font-semibold tracking-tight">{room.name}</h1>
+              {room.description ? (
+                <p className="text-sm text-muted-foreground">{room.description}</p>
+              ) : (
+                <p className="text-sm text-muted-foreground">No room description yet.</p>
+              )}
+            </div>
+            {session?.userId === room.adminId ? (
+              <Button variant="outline" asChild>
+                <Link href={`/room/${room.roomSlug}/admin`}>Manage Room</Link>
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        {session ? <CreatePost roomId={room.id} /> : null}
 
         <div className="space-y-6">
           {posts.map((post) => (
-            <PostCard key={post.id} post={post} dbUserId={dbUserId} />
+            <PostCard
+              key={post.id}
+              post={post}
+              dbUserId={session?.userId ?? null}
+              canPinPost={session?.userId === room.adminId}
+            />
           ))}
         </div>
       </div>
@@ -35,7 +54,7 @@ export default async function Room({ params }: { params: Promise<{ roomSlug: str
         <div className="mb-6">
           <UserSearch />
         </div>
-        {users?.length ? <SuggestedUsers users={users} /> : null}
+        {suggestedUsers?.length ? <SuggestedUsers users={suggestedUsers} /> : null}
       </div>
     </div>
   );

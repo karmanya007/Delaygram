@@ -1,13 +1,32 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Avatar, AvatarImage } from "./ui/avatar";
 import Link from "next/link";
 import FollowButton from "./FollowButton";
-import { getRandomUsers } from "@/actions/user.action";
+import { useState } from "react";
 
-type Users = Awaited<ReturnType<typeof getRandomUsers>>;
-type User = Users[number];
+type User = {
+  id: string;
+  name: string | null;
+  userName: string;
+  image: string | null;
+  _count: {
+    followers: number;
+  };
+};
 
-async function SuggestedUsers({ users }: { users: User[] }) {
+function SuggestedUsers({ users }: { users: User[] }) {
+  const [items, setItems] = useState(users);
+
+  const handleFollowChange = (userId: string, following: boolean) => {
+    if (!following) {
+      return;
+    }
+
+    setItems((current) => current.filter((user) => user.id !== userId));
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -15,7 +34,7 @@ async function SuggestedUsers({ users }: { users: User[] }) {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {users.map((user) => (
+          {items.map((user) => (
             <div key={user.id} className="flex gap-2 items-center justify-between ">
               <div className="flex items-center gap-1">
                 <Link href={`/profile/${user.userName}`}>
@@ -31,7 +50,10 @@ async function SuggestedUsers({ users }: { users: User[] }) {
                   <p className="text-muted-foreground">{user._count.followers} followers</p>
                 </div>
               </div>
-              <FollowButton userId={user.id} />
+              <FollowButton
+                userId={user.id}
+                onFollowChange={(following) => handleFollowChange(user.id, following)}
+              />
             </div>
           ))}
         </div>

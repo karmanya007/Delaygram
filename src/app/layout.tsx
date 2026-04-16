@@ -5,6 +5,8 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/ThemeProvider"
 import Navbar from "@/components/Navbar";
 import { Toaster } from "@/components/ui/toaster";
+import { RoomProvider } from "@/components/RoomContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Analytics } from '@vercel/analytics/next';
 
 const geistSans = localFont({
@@ -19,8 +21,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Delaygram",
-  description: "It'll be there, eventually.",
+  title: "Huddle",
+  description: "Your rooms, your people.",
 };
 
 export default function RootLayout({
@@ -40,19 +42,21 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
+            <RoomProvider>
             <div className="min-h-screen">
               <Navbar />
               <main className="py-8">
                 <div className="max-w-7xl mx-auto px-4">
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                     <div className="lg:col-span-12">
-                      {children}
+                      <ErrorBoundary>{children}</ErrorBoundary>
                     </div>
                   </div>
                 </div>
               </main>
             </div>
             <Toaster />
+            </RoomProvider>
           </ThemeProvider>
           <Analytics />
         </body>

@@ -43,7 +43,7 @@ export default function AddUser({ TriggerChild, ContentChild, users, setUsers, o
                                         {user.name || user.userName}
                                         <XCircle
                                             className="w-4 h-4 ml-1 cursor-pointer hover:text-red-500"
-                                            onClick={(event) => {
+                                            onClick={(event: React.MouseEvent<SVGSVGElement>) => {
                                                 event.stopPropagation();
                                                 handleRemoveUser(user.id);
                                             }}
