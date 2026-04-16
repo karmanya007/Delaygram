@@ -1,199 +1,83 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
-import { getDbUserId } from "./user.action";
-import { prisma } from "@/lib/prisma";
+import { revalidateTag } from "next/cache";
+import { z } from "zod";
+
+import { fail, ok, type ActionResult } from "@/lib/action-result";
+import { getAppSession } from "@/lib/auth/session";
+import { cacheTags } from "@/lib/cache-tags";
+import { isAppError } from "@/lib/errors";
+import { logError } from "@/lib/logger";
+import { runWithTrace } from "@/lib/trace";
+import {
+  getProfileByUsernameQuery,
+  getUserLikedPostsQuery,
+  getUserPostsQuery,
+} from "@/server/queries/profile.query";
+import { profileService } from "@/server/services/profile.service";
+import { userRepository } from "@/server/repositories/user.repository";
+import { postRepository } from "@/server/repositories/post.repository";
+
+const updateProfileSchema = z.object({
+  name: z.string().max(50),
+  bio: z.string().max(250),
+  location: z.string().max(100),
+  website: z.string().max(200).optional().default(""),
+  backgroundImage: z.string().url().or(z.literal("")).optional(),
+});
 
 export async function getProfileByUsername(username: string) {
-    try {
-        const user = await prisma.user.findUnique({
-            where: {
-                userName: username
-            },
-            select: {
-                id: true,
-                name: true,
-                userName: true,
-                bio: true,
-                image: true,
-                location: true,
-                website: true,
-                createdAt: true,
-                _count: {
-                    select: {
-                        followers: true,
-                        following: true,
-                        posts: true,
-                    },
-                },
-            },
-        });
-
-        return user;
-    } catch (error) {
-        console.error("Error in getting profile by username", error);
-        return null;
-    }
+  return getProfileByUsernameQuery(username);
 }
 
 export async function getUserPosts(userId: string) {
-    try {
-        const posts = await prisma.post.findMany({
-            where: {
-                authorId: userId,
-            },
-            include: {
-                author: {
-                    select: {
-                        id: true,
-                        name: true,
-                        userName: true,
-                        image: true,
-                    },
-                },
-                comments: {
-                    include: {
-                        author: {
-                            select: {
-                                id: true,
-                                name: true,
-                                userName: true,
-                                image: true,
-                            },
-                        },
-                    },
-                    orderBy: {
-                        createdAt: "asc",
-                    },
-                },
-                likes: {
-                    select: {
-                        userId: true,
-                    },
-                },
-                _count: {
-                    select: {
-                        likes: true,
-                        comments: true,
-                    },
-                },
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-        });
-
-        return posts;
-    } catch (error) {
-        console.error("Error fetching user posts:", error);
-        throw new Error("Failed to fetch user posts");
-    }
+  return getUserPostsQuery(userId);
 }
 
 export async function getUserLikedPosts(userId: string) {
-    try {
-        const likedPosts = await prisma.post.findMany({
-            where: {
-                likes: {
-                    some: {
-                        userId,
-                    },
-                },
-            },
-            include: {
-                author: {
-                    select: {
-                        id: true,
-                        name: true,
-                        userName: true,
-                        image: true,
-                    },
-                },
-                comments: {
-                    include: {
-                        author: {
-                            select: {
-                                id: true,
-                                name: true,
-                                userName: true,
-                                image: true,
-                            },
-                        },
-                    },
-                    orderBy: {
-                        createdAt: "asc",
-                    },
-                },
-                likes: {
-                    select: {
-                        userId: true,
-                    },
-                },
-                _count: {
-                    select: {
-                        likes: true,
-                        comments: true,
-                    },
-                },
-            },
-            orderBy: {
-                createdAt: "desc",
-            },
-        });
-
-        return likedPosts;
-    } catch (error) {
-        console.error("Error fetching liked posts:", error);
-        throw new Error("Failed to fetch liked posts");
-    }
+  return getUserLikedPostsQuery(userId);
 }
 
-export async function updateProfile(formData: FormData) {
+export async function getUserSavedPosts(userId: string) {
+  return postRepository.listSavedPosts(userId);
+}
+
+export async function updateProfile(
+  input: z.input<typeof updateProfileSchema>,
+): Promise<ActionResult<{ userId: string }>> {
+  return runWithTrace(async () => {
     try {
-        const { userId: clerkId } = await auth();
-        if (!clerkId) throw new Error("Unauthorized");
-
-        const name = formData.get("name") as string;
-        const bio = formData.get("bio") as string;
-        const location = formData.get("location") as string;
-        const website = formData.get("website") as string;
-
-        const user = await prisma.user.update({
-            where: { clerkId },
-            data: {
-                name,
-                bio,
-                location,
-                website,
-            },
-        });
-
-        revalidatePath("/profile");
-        return { success: true, user };
+      const parsed = updateProfileSchema.parse(input);
+      const user = await profileService.updateProfile(parsed);
+      revalidateTag(cacheTags.profile(user.id));
+      return ok({ userId: user.id });
     } catch (error) {
-        console.error("Error updating profile:", error);
-        return { success: false, error: "Failed to update profile" };
+      if (error instanceof z.ZodError) {
+        return fail("validation", error.errors[0]?.message ?? "Invalid profile payload");
+      }
+
+      if (isAppError(error)) {
+        return fail(error.code, error.message);
+      }
+
+      logError("actions.updateProfile", error);
+      return fail("infrastructure", "Failed to update profile");
     }
+  });
 }
 
 export async function isFollowing(userId: string) {
-    try {
-        const currentUserId = await getDbUserId();
-        if (!currentUserId) return false;
+  try {
+    const session = await getAppSession({ provision: true });
 
-        const follow = await prisma.follows.findUnique({
-            where: {
-                followerId_followingId: {
-                    followerId: currentUserId,
-                    followingId: userId,
-                },
-            },
-        });
-
-        return !!follow;
-    } catch (error) {
-        console.error("Error checking follow status:", error);
-        return false;
+    if (!session) {
+      return false;
     }
+
+    const follow = await userRepository.findFollow(session.userId, userId);
+    return Boolean(follow);
+  } catch (error) {
+    logError("actions.isFollowing", error, { userId });
+    return false;
+  }
 }

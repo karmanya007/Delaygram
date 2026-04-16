@@ -5,26 +5,79 @@ const f = createUploadthing();
 
 // FileRouter for your app, can contain multiple FileRoutes
 export const ourFileRouter = {
-    // Define as many FileRoutes as you like, each with a unique routeSlug
+    // Multi-image uploader for posts (up to 10 images)
     imageUploader: f({
         image: {
-            /**
-             * For full list of options and defaults, see the File Route API reference
-             * @see https://docs.uploadthing.com/file-routes#route-config
-             */
+            maxFileSize: "8MB",
+            maxFileCount: 10,
+        },
+    })
+        .middleware(async ({ req }) => {
+            const { userId } = await auth();
+            if (!userId) throw new Error("Unauthorized");
+            return { userId };
+        })
+        .onUploadComplete(async ({ metadata, file }) => {
+            try {
+                return { fileUrl: file.url, uploadedBy: metadata.userId };
+            } catch (error) {
+                console.error("Error in onUploadComplete:", error);
+                throw error;
+            }
+        }),
+
+    // Video uploader for posts
+    videoUploader: f({
+        video: {
+            maxFileSize: "256MB",
+            maxFileCount: 5,
+        },
+    })
+        .middleware(async ({ req }) => {
+            const { userId } = await auth();
+            if (!userId) throw new Error("Unauthorized");
+            return { userId };
+        })
+        .onUploadComplete(async ({ metadata, file }) => {
+            try {
+                return { fileUrl: file.url, uploadedBy: metadata.userId };
+            } catch (error) {
+                console.error("Error in onUploadComplete:", error);
+                throw error;
+            }
+        }),
+
+    // Profile background image uploader
+    profileBgUploader: f({
+        image: {
+            maxFileSize: "8MB",
+            maxFileCount: 1,
+        },
+    })
+        .middleware(async ({ req }) => {
+            const { userId } = await auth();
+            if (!userId) throw new Error("Unauthorized");
+            return { userId };
+        })
+        .onUploadComplete(async ({ metadata, file }) => {
+            try {
+                return { fileUrl: file.url, uploadedBy: metadata.userId };
+            } catch (error) {
+                console.error("Error in onUploadComplete:", error);
+                throw error;
+            }
+        }),
+
+    // Comment image uploader
+    commentImageUploader: f({
+        image: {
             maxFileSize: "4MB",
             maxFileCount: 1,
         },
     })
-        // Set permissions and file types for this FileRoute
         .middleware(async ({ req }) => {
-            // This code runs on your server before upload
             const { userId } = await auth();
-
-            // If you throw, the user will not be able to upload
             if (!userId) throw new Error("Unauthorized");
-
-            // Whatever is returned here is accessible in onUploadComplete as `metadata`
             return { userId };
         })
         .onUploadComplete(async ({ metadata, file }) => {

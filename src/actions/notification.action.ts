@@ -1,75 +1,54 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
-import { getDbUserId } from "./user.action";
+import { revalidateTag } from "next/cache";
+import { z } from "zod";
+
+import { fail, ok, type ActionResult } from "@/lib/action-result";
+import { getAppSession } from "@/lib/auth/session";
+import { cacheTags } from "@/lib/cache-tags";
+import { isAppError } from "@/lib/errors";
+import { logError } from "@/lib/logger";
+import { runWithTrace } from "@/lib/trace";
+import { getNotificationsQuery } from "@/server/queries/notifications.query";
+import { notificationService } from "@/server/services/notification.service";
+
+const markNotificationsReadSchema = z.object({
+  notificationIds: z.array(z.string().min(1)),
+});
 
 export async function getNotifications() {
-    try {
-        const userId = await getDbUserId();
-        if (!userId) return [];
-
-        const notifications = await prisma.notification.findMany({
-            where: {
-                userId
-            },
-            include: {
-                creator: {
-                    select: {
-                        id: true,
-                        name: true,
-                        userName: true,
-                        image: true,
-                    },
-                },
-                post: {
-                    select: {
-                        id: true,
-                        content: true,
-                        image: true,
-                    },
-                },
-                comment: {
-                    select: {
-                        id: true,
-                        content: true,
-                        createdAt: true,
-                    },
-                },
-                room: {
-                    select: {
-                        roomSlug: true,
-                        name: true
-                    }
-                }
-            },
-            orderBy: {
-                createdAt: "desc"
-            }
-        });
-
-        return notifications;
-    } catch (error) {
-        console.error("Error in getting notifications", error);
-        return [];
-    }
+  const result = await getNotificationsQuery();
+  return result.notifications;
 }
 
-export async function markNotificationAsRead(notificationIds: string[]) {
+export async function markNotificationAsRead(
+  input: z.input<typeof markNotificationsReadSchema>,
+): Promise<ActionResult<{ updated: true }>> {
+  return runWithTrace(async () => {
     try {
-        await prisma.notification.updateMany({
-            where: {
-                id: {
-                    in: notificationIds
-                }
-            },
-            data: {
-                read: true
-            }
-        });
+      const parsed = markNotificationsReadSchema.parse(input);
+      await notificationService.markAsRead(parsed);
 
-        return { success: true };
+      const session = await getAppSession({ provision: true });
+      if (session) {
+        revalidateTag(cacheTags.notifications(session.userId));
+      }
+
+      return ok({ updated: true });
     } catch (error) {
-        console.error("Error in marking notification as read", error);
-        return { success: false };
+      if (error instanceof z.ZodError) {
+        return fail(
+          "validation",
+          error.errors[0]?.message ?? "Invalid notification payload",
+        );
+      }
+
+      if (isAppError(error)) {
+        return fail(error.code, error.message);
+      }
+
+      logError("actions.markNotificationAsRead", error);
+      return fail("infrastructure", "Failed to mark notifications as read");
     }
+  });
 }
